@@ -261,12 +261,14 @@ docker compose exec app php bin/phpunit
 ├── public/             # Web server entry point
 ├── src/
 │   ├── Controller/     # API Entry points (UrlController)
-│   ├── DTO/            # Data Transfer Objects & Validation (UrlShortenRequest)
+│   ├── Dto/            # Data Transfer Objects & Validation (UrlShortenRequest)
 │   ├── Entity/         # Database Models (Url)
+│   ├── Message/        # Asynchronous message payloads (UrlClick)
+│   ├── MessageHandler/ # Consumers for async messages (UrlClickHandler)
 │   ├── Repository/     # Database Queries (UrlRepository)
 │   └── Service/        # Business Logic & Caching (UrlShortener)
 ├── tests/              # PHPUnit Tests
 ├── compose.yaml        # Docker services configuration
-├── Dockerfile          # PHP image definition
+├── Dockerfile          # PHP multi-stage image definition
 └── README.md           # Project documentation
 ```
