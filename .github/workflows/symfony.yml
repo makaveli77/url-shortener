@@ -22,7 +22,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_DB: app_test
-          POSTGRES_PASSWORD: "!psgrsqlpswd!"
+          POSTGRES_PASSWORD: "testpassword123"
           POSTGRES_USER: app
         ports:
           - 5432:5432
@@ -75,14 +75,14 @@ jobs:
         php bin/console doctrine:database:create --env=test
         php bin/console doctrine:schema:create --env=test
       env:
-        DATABASE_URL: postgresql://app:!psgrsqlpswd!@127.0.0.1:5432/app_test?serverVersion=16&charset=utf8
+        DATABASE_URL: postgresql://app:testpassword123@127.0.0.1:5432/app_test?serverVersion=16&charset=utf8
         REDIS_URL: redis://127.0.0.1:6379
 
     # Run the PHPUnit tests
     - name: Execute tests (Unit and Feature tests) via PHPUnit
       run: vendor/bin/phpunit
       env:
-        DATABASE_URL: postgresql://app:!psgrsqlpswd!@127.0.0.1:5432/app_test?serverVersion=16&charset=utf8
+        DATABASE_URL: postgresql://app:testpassword123@127.0.0.1:5432/app_test?serverVersion=16&charset=utf8
         REDIS_URL: redis://127.0.0.1:6379
 
     # Run Static Analysis
