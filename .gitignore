@@ -1,0 +1,36 @@
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+!/.env.example
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
+
+###> symfony/asset-mapper ###
+/public/assets/
+/assets/vendor/
+###< symfony/asset-mapper ###
+
+###> local environment & tools ###
+/.idea/
+/.vscode/
+.DS_Store
+/compose.override.yaml
+/docker-compose.override.yml
+/node_modules/
+/npm-debug.log
+/yarn-error.log
+###< local environment & tools ###
+
+###> phpstan/phpstan ###
+phpstan.neon
+###< phpstan/phpstan ###

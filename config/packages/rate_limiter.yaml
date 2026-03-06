@@ -1,0 +1,6 @@
+framework:
+    rate_limiter:
+        api_shorten:
+            policy: 'sliding_window'
+            limit: 50           # Allows 50 requests
+            interval: '60 minutes' # per hour
