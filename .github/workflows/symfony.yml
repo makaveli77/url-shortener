@@ -94,7 +94,7 @@ jobs:
 
     # Run Static Analysis
     - name: Execute static analysis (PHPStan)
-      run: vendor/bin/phpstan analyse -c phpstan.neon.dist
+      run: vendor/bin/phpstan analyse -c phpstan.neon.dist --memory-limit=1G
 
   deploy_staging:
     # Trigger only if it's a PUSH event to the 'staging' branch
