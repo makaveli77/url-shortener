@@ -84,6 +84,10 @@ jobs:
         DATABASE_URL: postgresql://app:!ChangeMe!@127.0.0.1:5432/app_test?serverVersion=16&charset=utf8
         REDIS_URL: redis://127.0.0.1:6379
 
+    # Run Static Analysis
+    - name: Execute static analysis (PHPStan)
+      run: vendor/bin/phpstan analyse -c phpstan.neon.dist
+
   deploy_staging:
     # Trigger only if it's a PUSH event to the 'staging' branch
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
