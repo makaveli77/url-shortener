@@ -1,0 +1,157 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Dashboard{% endblock %}
+{% block header %}Welcome back, {{ app.user.email }}!{% endblock %}
+
+{% block body %}
+<div class="row mb-8">
+    <div class="bg-gray-800 overflow-hidden shadow sm:rounded-lg p-6">
+        <h3 class="text-lg font-medium text-gray-100 mb-4">Create New Short URL</h3>
+        <form id="shortenForm" class="space-y-4">
+            <div id="formAlert" class="hidden rounded-md p-4 bg-red-900 text-red-200 border border-red-700 text-sm mb-4"></div>
+            
+            <div>
+                <label for="url" class="block text-sm font-medium text-gray-300">Original URL *</label>
+                <div class="mt-1">
+                    <input type="url" name="url" id="url" required class="block w-full rounded-md border-gray-600 bg-gray-700 text-white placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="https://example.com/very/long/url">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="alias" class="block text-sm font-medium text-gray-300">Custom Alias (Optional)</label>
+                    <div class="mt-1">
+                        <input type="text" name="alias" id="alias" class="block w-full rounded-md border-gray-600 bg-gray-700 text-white placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="my-custom-name">
+                    </div>
+                </div>
+                <div>
+                    <label for="expiresAt" class="block text-sm font-medium text-gray-300">Expiration Date (Optional)</label>
+                    <div class="mt-1">
+                        <input type="datetime-local" name="expiresAt" id="expiresAt" class="block w-full rounded-md border-gray-600 bg-gray-700 text-white placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-300">Password Protect (Optional)</label>
+                    <div class="mt-1">
+                        <input type="password" name="password" id="password" class="block w-full rounded-md border-gray-600 bg-gray-700 text-white placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="SecretPassword">
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <button type="submit" id="submitBtn" class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Shorten
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="bg-gray-800 overflow-hidden shadow sm:rounded-lg">
+    <div class="px-4 py-5 border-b border-gray-700 sm:px-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-100">Your shortened URLs</h3>
+    </div>
+    
+    {% if urls is empty %}
+        <div class="px-4 py-5 sm:p-6 text-center">
+            <div class="mt-2 max-w-xl text-sm text-gray-400 mx-auto">
+                <p>You haven't shortened any URLs yet!</p>
+            </div>
+        </div>
+    {% else %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y border-t border-gray-700 divide-gray-700">
+                <thead class="bg-gray-700">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Short URL</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Original URL</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Clicks</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Expires At</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-gray-800 divide-y divide-gray-700">
+                    {% for url in urls %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-400">
+                            <a href="/{{ url.shortCode }}" target="_blank">{{ url.shortCode }}</a>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-400 max-w-xs truncate" title="{{ url.originalUrl }}">
+                            {{ url.originalUrl }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-center">
+                            {{ url.clickCount }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                            {{ url.createdAt|date('Y-m-d H:i') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                            {{ url.expiresAt ? url.expiresAt|date('Y-m-d H:i') : 'Never' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('shortenForm');
+        const alert = document.getElementById('formAlert');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            alert.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+            
+            const payload = {
+                url: document.getElementById('url').value
+            };
+            
+            const alias = document.getElementById('alias').value;
+            if (alias) payload.alias = alias;
+            
+            const expiresAt = document.getElementById('expiresAt').value;
+            if (expiresAt) {
+                // Convert simple datetime-local string to ISO 8601 string expecting UTC
+                const date = new Date(expiresAt);
+                payload.expiresAt = date.toISOString();
+            }
+
+            const password = document.getElementById('password').value;
+            if (password) payload.password = password;
+            
+            try {
+                const response = await fetch('/api/shorten', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || data.error || 'Validation failed. Check your data.');
+                }
+                
+                // Reload on success to show new URL
+                location.reload();
+                
+            } catch (error) {
+                alert.textContent = error.message;
+                alert.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Shorten';
+            }
+        });
+    });
+</script>
+{% endblock %}

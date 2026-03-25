@@ -4,6 +4,10 @@ echo "🚀 Starting URL Shortener Setup..."
 
 echo "📦 Building and starting Docker containers..."
 docker compose up -d --build
+sleep 5
+docker compose exec app php bin/console tailwind:init
+docker compose exec app chmod +x var/tailwind/*/tailwindcss-*
+docker compose exec app php bin/console tailwind:build
 
 echo "📥 Installing PHP dependencies..."
 docker compose exec app composer install

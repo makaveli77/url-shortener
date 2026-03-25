@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\Url;
 use App\Message\UrlClick;
 use App\Repository\UrlRepository;
+use App\Repository\BlacklistedDomainRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -16,12 +17,18 @@ class UrlShortener
         private UrlRepository $urlRepository,
         private EntityManagerInterface $entityManager,
         private CacheInterface $cache,
-        private MessageBusInterface $messageBus
+        private MessageBusInterface $messageBus,
+        private BlacklistedDomainRepository $blacklistedDomainRepository,
     ) {
     }
 
-    public function shorten(string $originalUrl, ?string $alias = null, ?\DateTimeImmutable $expiresAt = null): string
+    public function shorten(string $originalUrl, ?string $alias = null, ?\DateTimeImmutable $expiresAt = null, ?\App\Entity\User $user = null, ?string $password = null): string
     {
+        $domain = parse_url($originalUrl, PHP_URL_HOST);
+        if ($domain !== null && $this->blacklistedDomainRepository->findOneBy(['domain' => $domain])) {
+            throw new \InvalidArgumentException('This domain is blacklisted and cannot be shortened.');
+        }
+
         if ($alias !== null) {
             // Check if it already exists
             if ($this->urlRepository->findOneBy(['shortCode' => $alias])) {
@@ -42,15 +49,23 @@ class UrlShortener
         $url->setOriginalUrl($originalUrl);
         $url->setShortCode($shortCode);
         
+        if ($user !== null) {
+            $url->setUser($user);
+        }
+        
         if ($expiresAt !== null) {
             $url->setExpiresAt($expiresAt);
+        }
+        
+        if ($password !== null && $password !== '') {
+            $url->setPasswordHash(password_hash($password, PASSWORD_BCRYPT));
         }
         
         $this->entityManager->persist($url);
         $this->entityManager->flush();
 
         // Cache it immediately
-        $this->cache->get('url_' . $shortCode, function (ItemInterface $item) use ($originalUrl, $expiresAt) {
+        $this->cache->get('url_' . $shortCode, function (ItemInterface $item) use ($originalUrl, $expiresAt, $password) {
             if ($expiresAt !== null) {
                 // Determine seconds until expiration
                 $ttl = $expiresAt->getTimestamp() - time();
@@ -59,15 +74,18 @@ class UrlShortener
             } else {
                 $item->expiresAfter(3600 * 24); // 24 hours
             }
-            return $originalUrl;
+            return [
+                'url' => $originalUrl,
+                'passwordHash' => ($password !== null && $password !== '') ? password_hash($password, PASSWORD_BCRYPT) : null,
+            ];
         });
 
         return $shortCode;
     }
 
-    public function resolve(string $shortCode): ?string
+    public function resolve(string $shortCode): ?array
     {
-        return $this->cache->get('url_' . $shortCode, function (ItemInterface $item) use ($shortCode) {
+        $data = $this->cache->get('url_' . $shortCode, function (ItemInterface $item) use ($shortCode) {
             $url = $this->urlRepository->findOneBy(['shortCode' => $shortCode]);
             
             if (!$url) {
@@ -85,14 +103,27 @@ class UrlShortener
                 $item->expiresAfter(3600 * 24);
             }
 
-            return $url->getOriginalUrl();
+            return [
+                'url' => $url->getOriginalUrl(),
+                'passwordHash' => $url->getPasswordHash(),
+            ];
         });
+
+        // Handle legacy cache strings
+        if (is_string($data)) {
+            return [
+                'url' => $data,
+                'passwordHash' => null,
+            ];
+        }
+
+        return $data;
     }
 
-    public function trackClick(string $shortCode): void
+    public function trackClick(string $shortCode, ?string $ipAddress = null, ?string $userAgent = null, ?string $referer = null): void
     {
         // Optimized: Dispatch message to queue for async processing
-        $this->messageBus->dispatch(new UrlClick($shortCode));
+        $this->messageBus->dispatch(new UrlClick($shortCode, $ipAddress, $userAgent, $referer));
     }
 
     private function generateShortCode(int $length = 6): string

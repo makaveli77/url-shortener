@@ -1,0 +1,46 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Log in!{% endblock %}
+{% block header %}Please sign in{% endblock %}
+
+{% block body %}
+<div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+  <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+    <div class="bg-gray-800 py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <form method="post" class="space-y-6">
+            {% if error %}
+                <div class="rounded-md bg-red-900 border border-red-700 p-4 mb-4">
+                    <div class="flex">
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-200">{{ error.messageKey|trans(error.messageData, 'security') }}</h3>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div>
+                <label for="inputEmail" class="block text-sm font-medium text-gray-300">Email</label>
+                <div class="mt-1">
+                    <input type="email" value="{{ last_username }}" name="_username" id="inputEmail" class="block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 placeholder-gray-400 sm:text-sm" autocomplete="email" required autofocus>
+                </div>
+            </div>
+            
+            <div>
+                <label for="inputPassword" class="block text-sm font-medium text-gray-300">Password</label>
+                <div class="mt-1">
+                    <input type="password" name="_password" id="inputPassword" class="block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 placeholder-gray-400 sm:text-sm" autocomplete="current-password" required>
+                </div>
+            </div>
+
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+
+            <div>
+                <button type="submit" class="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Sign in
+                </button>
+            </div>
+        </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

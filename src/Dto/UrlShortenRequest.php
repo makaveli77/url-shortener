@@ -22,6 +22,9 @@ class UrlShortenRequest
 
         #[Assert\GreaterThan('now', message: 'Expiration date must be in the future.')]
         public readonly ?\DateTimeImmutable $expiresAt = null,
+
+        #[Assert\Length(min: 4, max: 50)]
+        public readonly ?string $password = null,
     ) {
     }
 }

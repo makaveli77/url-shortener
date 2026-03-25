@@ -2,6 +2,7 @@
 
 namespace App\MessageHandler;
 
+use App\Entity\ClickEvent;
 use App\Message\UrlClick;
 use App\Repository\UrlRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,6 +24,14 @@ class UrlClickHandler
 
         if ($url) {
             $url->incrementClickCount();
+            
+            $clickEvent = new ClickEvent();
+            $clickEvent->setUrl($url);
+            $clickEvent->setIpAddress($message->getIpAddress());
+            $clickEvent->setUserAgent($message->getUserAgent());
+            $clickEvent->setReferer($message->getReferer());
+
+            $this->entityManager->persist($clickEvent);
             $this->entityManager->flush();
         }
     }

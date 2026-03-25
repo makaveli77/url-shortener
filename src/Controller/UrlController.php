@@ -72,7 +72,9 @@ class UrlController extends AbstractController
         }
 
         try {
-            $shortCode = $this->urlShortener->shorten($requestDto->url, $requestDto->alias, $requestDto->expiresAt);
+            /** @var \App\Entity\User|null $user */
+            $user = $this->getUser();
+            $shortCode = $this->urlShortener->shorten($requestDto->url, $requestDto->alias, $requestDto->expiresAt, $user, $requestDto->password);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
         }
@@ -85,7 +87,7 @@ class UrlController extends AbstractController
         ], Response::HTTP_CREATED);
     }
 
-    #[Route('/{shortCode}', name: 'app_redirect', methods: ['GET'], requirements: ['shortCode' => '[a-zA-Z0-9-]+'])]
+    #[Route('/{shortCode}', name: 'app_redirect', methods: ['GET', 'POST'], requirements: ['shortCode' => '[a-zA-Z0-9-]+'])]
     #[OA\Response(
         response: 302,
         description: "Redirects to the original URL"
@@ -95,15 +97,112 @@ class UrlController extends AbstractController
         description: "URL not found"
     )]
     #[OA\Tag(name: 'URL Shortener')]
-    public function redirectUrl(string $shortCode): Response
+    public function redirectUrl(string $shortCode, Request $request): Response
     {
-        $originalUrl = $this->urlShortener->resolve($shortCode);
+        $resolveData = $this->urlShortener->resolve($shortCode);
 
-        if ($originalUrl) {
-             $this->urlShortener->trackClick($shortCode);
-             return $this->redirect($originalUrl);
+        if (!$resolveData) {
+            throw $this->createNotFoundException('URL not found');
         }
 
-        throw $this->createNotFoundException('URL not found');
+        $originalUrl = $resolveData['url'];
+        $passwordHash = $resolveData['passwordHash'];
+
+        if ($passwordHash) {
+            $error = null;
+            if ($request->isMethod('POST')) {
+                $password = $request->request->get('password', '');
+                if (password_verify((string)$password, (string)$passwordHash)) {
+                    $this->urlShortener->trackClick(
+                        $shortCode, 
+                        $request->getClientIp(), 
+                        substr($request->headers->get('User-Agent') ?? '', 0, 500), 
+                        substr($request->headers->get('referer') ?? '', 0, 500)
+                    );
+                    return $this->redirect($originalUrl);
+                }
+                $error = 'Invalid password';
+            }
+
+            return $this->render('url/password.html.twig', [
+                'shortCode' => $shortCode,
+                'error' => $error,
+            ]);
+        }
+
+        $this->urlShortener->trackClick(
+            $shortCode, 
+            $request->getClientIp(), 
+            substr($request->headers->get('User-Agent') ?? '', 0, 500), 
+            substr($request->headers->get('referer') ?? '', 0, 500)
+        );
+        return $this->redirect($originalUrl);
+    }
+
+    #[Route('/api/urls', name: 'api_urls_list', methods: ['GET'])]
+    public function listUrls(Request $request, \App\Repository\UrlRepository $urlRepository): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $page = max(1, $request->query->getInt('page', 1));
+        $limit = max(1, min(100, $request->query->getInt('limit', 10)));
+        $offset = ($page - 1) * $limit;
+
+        $urls = $urlRepository->findBy(
+            ['user' => $user],
+            ['createdAt' => 'DESC'],
+            $limit,
+            $offset
+        );
+
+        $total = $urlRepository->count(['user' => $user]);
+
+        $data = [];
+        foreach ($urls as $url) {
+            $data[] = [
+                'shortCode' => $url->getShortCode(),
+                'originalUrl' => $url->getOriginalUrl(),
+                'clicks' => $url->getClicks(),
+                'createdAt' => $url->getCreatedAt()->format(\DateTime::ATOM),
+                'shortUrl' => rtrim($this->baseUrl, '/') . '/' . $url->getShortCode(),
+            ];
+        }
+
+        return $this->json([
+            'data' => $data,
+            'meta' => [
+                'total' => $total,
+                'page' => $page,
+                'limit' => $limit,
+                'totalPages' => ceil($total / $limit)
+            ]
+        ]);
+    }
+
+    #[Route('/api/urls/{shortCode}', name: 'api_urls_delete', methods: ['DELETE'])]
+    public function deleteUrl(string $shortCode, \App\Repository\UrlRepository $urlRepository, \Doctrine\ORM\EntityManagerInterface $em): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $url = $urlRepository->findOneBy(['shortCode' => $shortCode]);
+
+        if (!$url) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($url->getUser() !== $user) {
+            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
+        $em->remove($url);
+        $em->flush();
+
+        return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 }

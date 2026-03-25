@@ -5,7 +5,6 @@ A professional, containerized URL Shortener API built with **Symfony 8**, **PHP 
 ## 📑 Summary
 
 This project is a high-performance URL shortening service designed for scalability and speed.
-
 - **Architecture**: Domain-Driven Design principles with strict separation of concerns (Controller → DTO → Service → Repository).
 - **Performance**: High-speed lookups using **Redis** caching for 24h retention of active links, falling back to PostgreSQL. Asynchronous click tracking processed via Redis queues (Symfony Messenger).
 - **Database Refinement**: Cleaned up the database schema by removing unnecessary auto-generated tables (e.g., Doctrine's `messenger_messages` failure queue), relying purely on Redis for message passing.
@@ -20,13 +19,14 @@ This project is a high-performance URL shortening service designed for scalabili
 - **Shorten URLs**: Generate unique alphanumeric codes for any valid URL.
 - **Custom Vanity URLs**: Users can provide a specific `alias` (e.g., `my-portfolio`) instead of using a generated hash.
 - **Link Expiration**: Create URLs that automatically expire and return a `410 Gone` after a specific datetime.
+- **Password Protection**: Secure important links with hashed passwords. Protected links natively prompt users via a built-in Twig interface before redirection.
+- **User Authentication & Dashboard**: Secure user registration and login. Includes a TailwindCSS-powered dark-mode UI to view and manage your generated links.
+- **Detailed Analytics**: Async tracking of click data including IP, User-Agent, and Referer via Redis queues, extending beyond simple click counts.
+- **Malicious Domain Blacklisting**: Built-in system and console commands to block specific domains from being shortened.
 - **Self-Reference Protection**: Anti-loop security that automatically rejects users trying to shorten the application's own URLs.
 - **Instant Redirection**: Low-latency redirection to original URLs.
 - **Caching Layer**: Redis cache implementation, minimizing database hits for frequently accessed links.
-- **Click Tracking**: Tracks the number of clicks per link (persisted to PostgreSQL via async background processor).
-- **Auto-Validation**: Automatic 422 error responses for invalid URLs or malformed JSON.
 - **Rate Limiting**: Protects against abuse and spam by limiting short link creation per IP address using Symfony RateLimiter.
-- **Interactive docs**: Integrated Swagger UI for testing endpoints directly in the browser.
 
 ---
 
@@ -38,7 +38,7 @@ Follow these steps to get the project running locally in minutes.
 - **Docker** & **Docker Compose**
 
 ### 1. Automatic Setup (Recommended)
-You can set up the entire project using our automated scripts. This will build the containers, install PHP dependencies, update the database schema, clear the cache, run the test suite, perform static analysis, and start background workers.
+You can set up the entire project using our automated scripts. This will build the containers, install PHP dependencies, update the database schema, clear the cache, run the test suite, perform static analysis, build Tailwind assets, and start background workers.
 
 **For Mac/Linux:**
 ```bash
@@ -72,6 +72,10 @@ docker compose exec app composer install
 docker compose exec app php bin/console doctrine:migrations:migrate -n
 # Clear the cache to ensure Nelmio/Swagger routes are loaded
 docker compose exec app php bin/console cache:clear
+# Initialize and build Tailwind CSS
+docker compose exec app php bin/console tailwind:init
+docker compose exec app chmod +x var/tailwind/*/tailwindcss-*
+docker compose exec app php bin/console tailwind:build
 # Prepare the test database and run the test suite
 docker compose exec app php bin/console doctrine:database:create --env=test --if-not-exists
 docker compose exec app php bin/console doctrine:migrations:migrate -n --env=test
@@ -83,8 +87,15 @@ docker compose exec -d app php bin/console messenger:consume async
 ```
 
 ### 3. Access the Application
+- **Frontend Dashboard**: `http://localhost:8000`
 - **API Base URL**: `http://localhost:8000`
 - **Swagger Documentation**: `http://localhost:8000/api/doc`
+
+### 4. Admin Commands
+**Add to Domain Blacklist:**
+```bash
+docker compose exec app php bin/console app:blacklist-domain evildomain.com
+```
 
 ---
 
@@ -100,7 +111,8 @@ Accepts a JSON payload with a long URL and returns a shortened version.
 {
   "url": "https://www.example.com/very/long/url",
   "alias": "optional-custom-name",
-  "expiresAt": "2026-12-31T23:59:59+00:00"
+  "expiresAt": "2026-12-31T23:59:59+00:00",
+  "password": "my-secret-password"
 }
 ```
 
@@ -128,8 +140,57 @@ Accepts a JSON payload with a long URL and returns a shortened version.
 Redirects the user to the original URL associated with the short code.
 
 - **Success**: `302 Found` (Redirects to destination)
+- **Password Protected**: Intercepts request and serves a password challenge UI.
 - **Not Found**: `404 Not Found`
 - **Expired**: `410 Gone` (Returned if the `expiresAt` datetime has passed)
+
+
+### 📋 List User URLs
+**GET** `/api/urls`
+
+Returns a paginated list of URLs shortened by the currently authenticated user. Supports `page` and `limit` query parameters.
+
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "originalUrl": "https://example.com/very/long/url",
+      "shortCode": "AbCd12",
+      "clickCount": 42,
+      "alias": "optional-custom-name",
+      "expiresAt": null,
+      "createdAt": "2026-03-05T10:00:00+00:00"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "page": 1,
+    "limit": 10,
+    "pages": 1
+  }
+}
+```
+
+### 🗑️ Delete URL
+**DELETE** `/api/urls/{shortCode}`
+
+Deletes a URL (and its associated click statistics) belonging to the authenticated user.
+- **Success**: `204 No Content`
+- **Not Found / Unauthorized**: `404 Not Found`
+
+### 🏥 Health Check
+**GET** `/api/health`
+
+Validates connection to the PostgreSQL database and Redis server.
+- **Success**: `200 OK`
+- **Failure**: `503 Service Unavailable`
+
+### 📈 Metrics
+**GET** `/api/metrics`
+
+Prometheus-compatible endpoint exposing application metrics (clicks, queue sizes, memory usage).
 
 ---
 
@@ -143,9 +204,16 @@ The application uses **Doctrine ORM** to manage the schema.
 | `id` | `INT` | Primary Key, Auto-increment |
 | `original_url` | `TEXT` | The original long URL |
 | `short_code` | `VARCHAR(50)` | Unique, random alphanumeric code or custom alias (Indexed: `idx_short_code`) |
+| `password_hash` | `VARCHAR(255)` | (Optional) Bcrypt hashed password to protect links |
 | `click_count` | `INT` | Counter for total visits (Default: 0) |
 | `expires_at` | `DATETIME` | (Optional) When the link should stop working and return 410 |
 | `created_at` | `DATETIME` | Timestamp of creation (Indexed: `idx_created_at`) |
+
+**Table: `click_event`**
+Tracks detailed analytics per visit (IP, Referer, User-Agent), processed asynchronously via Redis.
+
+**Table: `user`**
+Handles authentication and associates urls with specific creators.
 
 ---
 
@@ -186,91 +254,15 @@ To enable deployment, configure the following secrets in your GitHub repository 
 
 ---
 
-## �🛠 Tech Stack
+## 🛠 Tech Stack
 
 **Core Infrastructure**
 - **Symfony 8**: The latest version of the high-performance PHP framework.
 - **PHP 8.4**: Using the latest features like Attributes, Readonly classes, and constructor promotion.
 - **PostgreSQL 16**: Robust relational database for persistent storage.
-- **Redis**: In-memory data store for caching URL lookups (high speed).
+- **Redis**: In-memory data store for caching URL lookups and message queues.
+- **TailwindCSS**: Utilty-first CSS framework for rapid UI development (Dark Mode).
 - **Docker Compose**: Orchestration of the entire stack.
 
 **Libraries & Bundles**
 - **NelmioApiDocBundle**: Automatic OpenAPI / Swagger documentation generation.
-- **Doctrine ORM**: Database interactions and entity management.
-- **Symfony Validator**: Request validation via Attributes (`#[Assert\Url]`).
-
----
-
-## 🔨 Development Commands
-
-Here are some common commands you might need during development.
-
-**run command inside container**
-```bash
-docker compose exec app <command>
-```
-
-**Clear Cache**
-```bash
-docker compose exec app php bin/console cache:clear
-```
-
-**Update Database Schema**
-```bash
-docker compose exec app php bin/console doctrine:schema:update --force
-```
-
-**Check Container Status**
-```bash
-docker compose ps
-```
-
-**View Logs**
-```bash
-docker compose logs -f app
-```
-
-**Run Tests**
-```bash
-docker compose exec app php bin/phpunit
-```
-
-**Run Static Analysis (PHPStan Level 8)**
-```bash
-docker compose exec app vendor/bin/phpstan analyse -c phpstan.neon.dist --memory-limit=1G
-```
-
----
-
-## 🧪 Testing
-
-The project uses **PHPUnit** for automated testing.
-We use a separate **SQLite** database for tests to ensure speed and isolation from your development data.
-
-**Run all tests**
-```bash
-docker compose exec app php bin/phpunit
-```
-
----
-
-## 📁 Project Structure
-
-```
-.
-├── config/             # Symfony configuration files (routes, packages, services)
-├── public/             # Web server entry point
-├── src/
-│   ├── Controller/     # API Entry points (UrlController)
-│   ├── Dto/            # Data Transfer Objects & Validation (UrlShortenRequest)
-│   ├── Entity/         # Database Models (Url)
-│   ├── Message/        # Asynchronous message payloads (UrlClick)
-│   ├── MessageHandler/ # Consumers for async messages (UrlClickHandler)
-│   ├── Repository/     # Database Queries (UrlRepository)
-│   └── Service/        # Business Logic & Caching (UrlShortener)
-├── tests/              # PHPUnit Tests
-├── compose.yaml        # Docker services configuration
-├── Dockerfile          # PHP multi-stage image definition
-└── README.md           # Project documentation
-```
