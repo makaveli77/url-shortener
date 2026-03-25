@@ -38,7 +38,7 @@ Follow these steps to get the project running locally in minutes.
 - **Docker** & **Docker Compose**
 
 ### 1. Automatic Setup (Recommended)
-You can set up the entire project using our automated scripts. This will build the containers, install PHP dependencies, update the database schema, clear the cache, run the test suite, and start background workers.
+You can set up the entire project using our automated scripts. This will build the containers, install PHP dependencies, update the database schema, clear the cache, run the test suite, perform static analysis, and start background workers.
 
 **For Mac/Linux:**
 ```bash
@@ -76,6 +76,8 @@ docker compose exec app php bin/console cache:clear
 docker compose exec app php bin/console doctrine:database:create --env=test --if-not-exists
 docker compose exec app php bin/console doctrine:migrations:migrate -n --env=test
 docker compose exec app php bin/phpunit
+# Run static analysis
+docker compose exec app vendor/bin/phpstan analyse -c phpstan.neon.dist --memory-limit=1G
 # Start the background worker (in detached mode)
 docker compose exec -d app php bin/console messenger:consume async
 ```
@@ -188,7 +190,7 @@ To enable deployment, configure the following secrets in your GitHub repository 
 
 **Core Infrastructure**
 - **Symfony 8**: The latest version of the high-performance PHP framework.
-- **PHP 8.2**: Using the latest features like Attributes, Readonly classes, and constructor promotion.
+- **PHP 8.4**: Using the latest features like Attributes, Readonly classes, and constructor promotion.
 - **PostgreSQL 16**: Robust relational database for persistent storage.
 - **Redis**: In-memory data store for caching URL lookups (high speed).
 - **Docker Compose**: Orchestration of the entire stack.
