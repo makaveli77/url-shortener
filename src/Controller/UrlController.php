@@ -165,8 +165,8 @@ class UrlController extends AbstractController
             $data[] = [
                 'shortCode' => $url->getShortCode(),
                 'originalUrl' => $url->getOriginalUrl(),
-                'clicks' => $url->getClicks(),
-                'createdAt' => $url->getCreatedAt()->format(\DateTime::ATOM),
+                'clicks' => $url->getClickCount(),
+                'createdAt' => $url->getCreatedAt()?->format(\DateTime::ATOM) ?? null,
                 'shortUrl' => rtrim($this->baseUrl, '/') . '/' . $url->getShortCode(),
             ];
         }

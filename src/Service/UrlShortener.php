@@ -83,6 +83,12 @@ class UrlShortener
         return $shortCode;
     }
 
+    /**
+     * @return array{url: string, passwordHash: string|null}|null
+     */
+    /**
+     * @return array{url: string, passwordHash: string|null}|null
+     */
     public function resolve(string $shortCode): ?array
     {
         $data = $this->cache->get('url_' . $shortCode, function (ItemInterface $item) use ($shortCode) {
@@ -104,18 +110,10 @@ class UrlShortener
             }
 
             return [
-                'url' => $url->getOriginalUrl(),
+                'url' => (string) $url->getOriginalUrl(),
                 'passwordHash' => $url->getPasswordHash(),
             ];
         });
-
-        // Handle legacy cache strings
-        if (is_string($data)) {
-            return [
-                'url' => $data,
-                'passwordHash' => null,
-            ];
-        }
 
         return $data;
     }

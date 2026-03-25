@@ -16,7 +16,7 @@ class ClickEvent
 
     #[ORM\ManyToOne(targetEntity: Url::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private ?Url $url = null;
+    private Url $url;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $ipAddress = null;
@@ -28,7 +28,7 @@ class ClickEvent
     private ?string $referer = null;
 
     #[ORM\Column]
-    private ?\DateTimeImmutable $clickedAt = null;
+    private \DateTimeImmutable $clickedAt;
 
     public function __construct()
     {
@@ -40,12 +40,12 @@ class ClickEvent
         return $this->id;
     }
 
-    public function getUrl(): ?Url
+    public function getUrl(): Url
     {
         return $this->url;
     }
 
-    public function setUrl(?Url $url): static
+    public function setUrl(Url $url): static
     {
         $this->url = $url;
         return $this;
@@ -84,7 +84,7 @@ class ClickEvent
         return $this;
     }
 
-    public function getClickedAt(): ?\DateTimeImmutable
+    public function getClickedAt(): \DateTimeImmutable
     {
         return $this->clickedAt;
     }

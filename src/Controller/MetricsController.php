@@ -33,9 +33,9 @@ class MetricsController extends AbstractController
         $queueSize = 0;
         try {
             $redis = new RedisClient($redisUrl);
-            $info = $redis->xinfo('STREAM', 'messages');
-            if (is_array($info) && isset($info['length'])) {
-                $queueSize = (int) $info['length'];
+            $len = $redis->xlen('messages');
+            if ($len) {
+                $queueSize = (int) $len;
             }
         } catch (\Exception $e) {
             // Ignore missing stream or redis connection issues

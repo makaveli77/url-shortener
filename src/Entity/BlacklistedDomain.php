@@ -14,14 +14,14 @@ class BlacklistedDomain
     private ?int $id = null;
 
     #[ORM\Column(length: 255, unique: true)]
-    private ?string $domain = null;
+    private string $domain;
 
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function getDomain(): ?string
+    public function getDomain(): string
     {
         return $this->domain;
     }
