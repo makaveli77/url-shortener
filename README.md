@@ -19,7 +19,7 @@ This project is a high-performance URL shortening service designed for scalabili
 - **Shorten URLs**: Generate unique alphanumeric codes for any valid URL.
 - **Custom Vanity URLs**: Users can provide a specific `alias` (e.g., `my-portfolio`) instead of using a generated hash.
 - **Link Expiration**: Create URLs that automatically expire and return a `410 Gone` after a specific datetime.
-- **Password Protection**: Secure important links with hashed passwords. Protected links natively prompt users via a built-in Twig interface before redirection.
+- **Password Protection**: Secure important links with hashed passwords. Protected links natively prompt users via a built-in Twig interface before redirection. To ensure seamless redirection to external domains (bypassing CORS restrictions), the password form is served with Turbo disabled.
 - **User Authentication & Dashboard**: Secure user registration and login. Includes a TailwindCSS-powered dark-mode UI to view and manage your generated links.
 - **Detailed Analytics**: Async tracking of click data including IP, User-Agent, and Referer via Redis queues, extending beyond simple click counts.
 - **Malicious Domain Blacklisting**: Built-in system and console commands to block specific domains from being shortened.

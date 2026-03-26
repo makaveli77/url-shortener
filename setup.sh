@@ -23,6 +23,12 @@ docker compose exec app php bin/console doctrine:migrations:migrate -n
 echo "🧹 Clearing the application cache..."
 docker compose exec app php bin/console cache:clear
 
+# Delete the development database to ensure a fresh start
+echo "🗄️ Resetting the development database..."
+docker compose exec app php bin/console doctrine:database:drop --force --if-exists
+docker compose exec app php bin/console doctrine:database:create
+docker compose exec app php bin/console doctrine:migrations:migrate -n
+
 echo "🧪 Preparing the test database..."
 docker compose exec app php bin/console doctrine:database:create --env=test --if-not-exists
 docker compose exec app php bin/console doctrine:migrations:migrate -n --env=test
