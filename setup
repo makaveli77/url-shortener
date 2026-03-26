@@ -1,4 +1,5 @@
 #!/bin/bash
+export REDIS_URL=redis://localhost:6379
 
 echo "🚀 Starting URL Shortener Setup..."
 
@@ -13,6 +14,9 @@ docker compose exec app php bin/console doctrine:migrations:migrate -n
 
 echo "🧹 Clearing the application cache..."
 docker compose exec app php bin/console cache:clear
+
+echo "🎨 Building Tailwind CSS..."
+docker compose exec app php bin/console tailwind:build
 
 echo "🧪 Preparing the test database..."
 docker compose exec app php bin/console doctrine:database:create --env=test --if-not-exists
