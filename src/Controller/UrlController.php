@@ -111,30 +111,27 @@ class UrlController extends AbstractController
         if ($passwordHash) {
             $error = null;
             if ($request->isMethod('POST')) {
-                $password = $request->request->get('password', '');
-                if (password_verify((string)$password, (string)$passwordHash)) {
-                    $this->urlShortener->trackClick(
-                        $shortCode, 
-                        $request->getClientIp(), 
-                        substr($request->headers->get('User-Agent') ?? '', 0, 500), 
-                        substr($request->headers->get('referer') ?? '', 0, 500)
-                    );
-                    return $this->redirect($originalUrl);
+                $password = (string)$request->request->get('password', '');
+                if (password_verify($password, (string)$passwordHash)) {
+                    $passwordHash = null; // Password OK, proceed to redirect
+                } else {
+                    $error = 'Invalid password';
                 }
-                $error = 'Invalid password';
             }
 
-            return $this->render('url/password.html.twig', [
-                'shortCode' => $shortCode,
-                'error' => $error,
-            ]);
+            if ($passwordHash) {
+                return $this->render('url/password.html.twig', [
+                    'shortCode' => $shortCode,
+                    'error' => $error,
+                ]);
+            }
         }
 
         $this->urlShortener->trackClick(
             $shortCode, 
             $request->getClientIp(), 
-            substr($request->headers->get('User-Agent') ?? '', 0, 500), 
-            substr($request->headers->get('referer') ?? '', 0, 500)
+            substr((string)$request->headers->get('User-Agent'), 0, 500), 
+            substr((string)$request->headers->get('referer'), 0, 500)
         );
         return $this->redirect($originalUrl);
     }
@@ -160,16 +157,14 @@ class UrlController extends AbstractController
 
         $total = $urlRepository->count(['user' => $user]);
 
-        $data = [];
-        foreach ($urls as $url) {
-            $data[] = [
-                'shortCode' => $url->getShortCode(),
-                'originalUrl' => $url->getOriginalUrl(),
-                'clicks' => $url->getClickCount(),
-                'createdAt' => $url->getCreatedAt()?->format(\DateTime::ATOM) ?? null,
-                'shortUrl' => rtrim($this->baseUrl, '/') . '/' . $url->getShortCode(),
-            ];
-        }
+        $baseUrl = rtrim($this->baseUrl, '/');
+        $data = array_map(fn($url) => [
+            'shortCode' => $url->getShortCode(),
+            'originalUrl' => $url->getOriginalUrl(),
+            'clicks' => $url->getClickCount(),
+            'createdAt' => $url->getCreatedAt()?->format(\DateTime::ATOM) ?? null,
+            'shortUrl' => $baseUrl . '/' . $url->getShortCode(),
+        ], $urls);
 
         return $this->json([
             'data' => $data,

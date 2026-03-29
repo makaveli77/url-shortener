@@ -57,15 +57,17 @@ class UrlShortener
             $url->setExpiresAt($expiresAt);
         }
         
+        $passwordHash = null;
         if ($password !== null && $password !== '') {
-            $url->setPasswordHash(password_hash($password, PASSWORD_BCRYPT));
+            $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+            $url->setPasswordHash($passwordHash);
         }
         
         $this->entityManager->persist($url);
         $this->entityManager->flush();
 
         // Cache it immediately
-        $this->cache->get('url_' . $shortCode, function (ItemInterface $item) use ($originalUrl, $expiresAt, $password) {
+        $this->cache->get('url_' . $shortCode, function (ItemInterface $item) use ($originalUrl, $expiresAt, $passwordHash) {
             if ($expiresAt !== null) {
                 // Determine seconds until expiration
                 $ttl = $expiresAt->getTimestamp() - time();
@@ -76,16 +78,13 @@ class UrlShortener
             }
             return [
                 'url' => $originalUrl,
-                'passwordHash' => ($password !== null && $password !== '') ? password_hash($password, PASSWORD_BCRYPT) : null,
+                'passwordHash' => $passwordHash,
             ];
         });
 
         return $shortCode;
     }
 
-    /**
-     * @return array{url: string, passwordHash: string|null}|null
-     */
     /**
      * @return array{url: string, passwordHash: string|null}|null
      */
